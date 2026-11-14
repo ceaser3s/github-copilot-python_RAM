@@ -1,23 +1,140 @@
 // Client-side rendering and interaction for the Flask-backed Sudoku.
 const SIZE = 9;
 let puzzle = [];
+let hintsUsed = 0;
+let elapsedSeconds = 0;
+let timerInterval = null;
+let completionCheckId = 0;
+let gameCompleted = false;
+
+function setMessage(text, kind = 'error') {
+  const message = document.getElementById('message');
+  message.innerText = text;
+  message.className = text ? kind : '';
+}
+
+async function readJson(response) {
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'The request could not be completed.');
+  }
+  return data;
+}
+
+function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const remainingSeconds = (seconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${remainingSeconds}`;
+}
+
+function updateTimer() {
+  document.getElementById('timer').innerText = `Time: ${formatTime(elapsedSeconds)}`;
+}
+
+function stopTimer() {
+  if (timerInterval !== null) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+}
+
+function startTimer() {
+  stopTimer();
+  elapsedSeconds = 0;
+  gameCompleted = false;
+  updateTimer();
+  timerInterval = setInterval(() => {
+    elapsedSeconds += 1;
+    updateTimer();
+  }, 1000);
+}
+
+function finishGame() {
+  if (gameCompleted) return;
+  gameCompleted = true;
+  stopTimer();
+  const hintLabel = hintsUsed === 1 ? 'hint' : 'hints';
+  setMessage(
+    `Congratulations! You solved it in ${formatTime(elapsedSeconds)} with ${hintsUsed} ${hintLabel}.`,
+    'success'
+  );
+}
+
+function getInputs() {
+  return Array.from(document.querySelectorAll('.sudoku-cell'));
+}
+
+function getBoard() {
+  const board = [];
+  const inputs = getInputs();
+  for (let row = 0; row < SIZE; row++) {
+    board[row] = [];
+    for (let col = 0; col < SIZE; col++) {
+      const value = inputs[row * SIZE + col].value;
+      board[row][col] = value ? Number.parseInt(value, 10) : 0;
+    }
+  }
+  return board;
+}
+
+function isBoardFull(board) {
+  return board.every((row) => row.every((value) => value !== 0));
+}
+
+function updateConflicts() {
+  const inputs = getInputs();
+  inputs.forEach((input) => input.classList.remove('conflict'));
+
+  for (let first = 0; first < inputs.length; first++) {
+    const firstInput = inputs[first];
+    if (!firstInput.value) continue;
+
+    const firstRow = Number(firstInput.dataset.row);
+    const firstCol = Number(firstInput.dataset.col);
+    for (let second = first + 1; second < inputs.length; second++) {
+      const secondInput = inputs[second];
+      if (firstInput.value !== secondInput.value) continue;
+
+      const secondRow = Number(secondInput.dataset.row);
+      const secondCol = Number(secondInput.dataset.col);
+      const sameBox =
+        Math.floor(firstRow / 3) === Math.floor(secondRow / 3) &&
+        Math.floor(firstCol / 3) === Math.floor(secondCol / 3);
+      if (
+        firstRow === secondRow ||
+        firstCol === secondCol ||
+        sameBox
+      ) {
+        firstInput.classList.add('conflict');
+        secondInput.classList.add('conflict');
+      }
+    }
+  }
+}
 
 function createBoardElement() {
   const boardDiv = document.getElementById('sudoku-board');
   boardDiv.innerHTML = '';
-  for (let i = 0; i < SIZE; i++) {
+  for (let row = 0; row < SIZE; row++) {
     const rowDiv = document.createElement('div');
     rowDiv.className = 'sudoku-row';
-    for (let j = 0; j < SIZE; j++) {
+    for (let col = 0; col < SIZE; col++) {
       const input = document.createElement('input');
       input.type = 'text';
+      input.inputMode = 'numeric';
       input.maxLength = 1;
       input.className = 'sudoku-cell';
-      input.dataset.row = i;
-      input.dataset.col = j;
-      input.addEventListener('input', (e) => {
-        const val = e.target.value.replace(/[^1-9]/g, '');
-        e.target.value = val;
+      input.dataset.row = row;
+      input.dataset.col = col;
+      input.setAttribute('aria-label', `Row ${row + 1}, column ${col + 1}`);
+      input.addEventListener('input', (event) => {
+        const cell = event.currentTarget;
+        cell.value = cell.value.replace(/[^1-9]/g, '');
+        cell.classList.remove('incorrect');
+        completionCheckId += 1;
+        updateConflicts();
+        const board = getBoard();
+        if (isBoardFull(board)) verifyCompletion(board);
       });
       rowDiv.appendChild(input);
     }
@@ -25,80 +142,118 @@ function createBoardElement() {
   }
 }
 
-function renderPuzzle(puz) {
-  puzzle = puz;
+function renderPuzzle(newPuzzle) {
+  puzzle = newPuzzle;
   createBoardElement();
-  const boardDiv = document.getElementById('sudoku-board');
-  const inputs = boardDiv.getElementsByTagName('input');
-  for (let i = 0; i < SIZE; i++) {
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
-      const val = puzzle[i][j];
-      const inp = inputs[idx];
-      if (val !== 0) {
-        inp.value = val;
-        inp.readOnly = true;
-        inp.className += ' prefilled';
-      } else {
-        inp.value = '';
-        inp.readOnly = false;
-      }
+  const inputs = getInputs();
+  for (let row = 0; row < SIZE; row++) {
+    for (let col = 0; col < SIZE; col++) {
+      const input = inputs[row * SIZE + col];
+      const value = puzzle[row][col];
+      input.value = value || '';
+      input.readOnly = value !== 0;
+      if (input.readOnly) input.classList.add('prefilled');
     }
   }
+  updateConflicts();
 }
 
 async function newGame() {
+  completionCheckId += 1;
   const difficulty = document.getElementById('difficulty').value;
-  const res = await fetch(`/new?difficulty=${encodeURIComponent(difficulty)}`);
-  const data = await res.json();
-  renderPuzzle(data.puzzle);
-  document.getElementById('message').innerText = '';
+  try {
+    const response = await fetch(
+      `/new?difficulty=${encodeURIComponent(difficulty)}`
+    );
+    const data = await readJson(response);
+    renderPuzzle(data.puzzle);
+    hintsUsed = 0;
+    document.getElementById('hint-count').innerText = 'Hints used: 0';
+    setMessage('');
+    startTimer();
+  } catch (error) {
+    setMessage(error.message);
+  }
 }
 
 async function checkSolution() {
-  const boardDiv = document.getElementById('sudoku-board');
-  const inputs = boardDiv.getElementsByTagName('input');
-  const board = [];
-  for (let i = 0; i < SIZE; i++) {
-    board[i] = [];
-    for (let j = 0; j < SIZE; j++) {
-      const idx = i * SIZE + j;
-      const val = inputs[idx].value;
-      board[i][j] = val ? parseInt(val, 10) : 0;
+  const board = getBoard();
+  try {
+    const response = await fetch('/check', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({board})
+    });
+    const data = await readJson(response);
+    const inputs = getInputs();
+    inputs.forEach((input) => input.classList.remove('incorrect'));
+    const incorrect = new Set(
+      data.incorrect.map(([row, col]) => row * SIZE + col)
+    );
+    incorrect.forEach((index) => inputs[index].classList.add('incorrect'));
+
+    if (isBoardFull(board) && incorrect.size === 0) {
+      finishGame();
+    } else if (incorrect.size > 0) {
+      setMessage('Some filled cells are incorrect.');
+    } else {
+      setMessage('Fill the remaining empty cells to finish.');
     }
+  } catch (error) {
+    setMessage(error.message);
   }
-  const res = await fetch('/check', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({board})
-  });
-  const data = await res.json();
-  const msg = document.getElementById('message');
-  if (data.error) {
-    msg.style.color = '#d32f2f';
-    msg.innerText = data.error;
-    return;
-  }
-  const incorrect = new Set(data.incorrect.map(x => x[0]*SIZE + x[1]));
-  for (let idx = 0; idx < inputs.length; idx++) {
-    const inp = inputs[idx];
-    if (inp.readOnly) continue;
-    inp.className = 'sudoku-cell';
-    if (incorrect.has(idx)) {
-      inp.className = 'sudoku-cell incorrect';
+}
+
+async function verifyCompletion(board) {
+  const checkId = ++completionCheckId;
+  try {
+    const response = await fetch('/check', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({board})
+    });
+    const data = await readJson(response);
+    if (checkId !== completionCheckId) return;
+    const currentBoard = getBoard();
+    if (
+      isBoardFull(currentBoard) &&
+      JSON.stringify(currentBoard) === JSON.stringify(board) &&
+      data.incorrect.length === 0
+    ) {
+      finishGame();
     }
+  } catch (error) {
+    if (checkId === completionCheckId) setMessage(error.message);
   }
-  if (incorrect.size === 0) {
-    msg.style.color = '#388e3c';
-    msg.innerText = 'Congratulations! You solved it!';
-  } else {
-    msg.style.color = '#d32f2f';
-    msg.innerText = 'Some cells are incorrect.';
+}
+
+async function requestHint() {
+  const board = getBoard();
+  try {
+    const response = await fetch('/hint', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({board})
+    });
+    const data = await readJson(response);
+    const input = getInputs()[data.row * SIZE + data.col];
+    input.value = data.value;
+    input.readOnly = true;
+    input.classList.add('hinted');
+    hintsUsed = data.hints_used;
+    document.getElementById('hint-count').innerText = `Hints used: ${hintsUsed}`;
+    setMessage('');
+    updateConflicts();
+    const updatedBoard = getBoard();
+    if (isBoardFull(updatedBoard)) verifyCompletion(updatedBoard);
+  } catch (error) {
+    setMessage(error.message);
   }
 }
 
 window.addEventListener('load', () => {
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
+  document.getElementById('hint').addEventListener('click', requestHint);
   newGame();
 });

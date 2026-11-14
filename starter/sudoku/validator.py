@@ -1,6 +1,6 @@
 """Sudoku request-board validation helpers."""
 
-from sudoku import SIZE
+from sudoku import EMPTY, SIZE
 
 
 def validate_board(
@@ -31,10 +31,10 @@ def validate_board(
 def find_incorrect_cells(
     board: list[list[int]], solution: list[list[int]]
 ) -> list[list[int]]:
-    """Return row and column coordinates where a board differs from a solution."""
+    """Return coordinates of filled cells that differ from the solution."""
     return [
         [row, col]
         for row in range(SIZE)
         for col in range(SIZE)
-        if board[row][col] != solution[row][col]
+        if board[row][col] != EMPTY and board[row][col] != solution[row][col]
     ]

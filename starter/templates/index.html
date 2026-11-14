@@ -2,12 +2,14 @@
 <html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sudoku Game</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
   <h1>Sudoku Game</h1>
   <div id="sudoku-board"></div>
+  <p id="timer" aria-live="polite">Time: 00:00</p>
   <div class="controls">
     <label for="difficulty">Difficulty:</label>
     <select id="difficulty" name="difficulty">
@@ -17,7 +19,9 @@
     </select>
     <button id="new-game">New Game</button>
     <button id="check-solution">Check Solution</button>
-    <span id="message"></span>
+    <button id="hint">Hint</button>
+    <span id="hint-count" aria-live="polite">Hints used: 0</span>
+    <p id="message" role="status" aria-live="polite"></p>
   </div>
   <script type="module" src="{{ url_for('static', filename='js/game.js') }}"></script>
 </body>

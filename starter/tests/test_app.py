@@ -103,7 +103,7 @@ def test_check_without_game_returns_error(client: FlaskClient) -> None:
 def test_check_reports_incorrect_cells(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The check route returns coordinates that differ from the solution."""
+    """Check reports wrong filled cells but ignores empty cells."""
     puzzle = [[0 for _ in range(9)] for _ in range(9)]
     solution = [
         [(row * 3 + row // 3 + col) % 9 + 1 for col in range(9)]
@@ -117,8 +117,53 @@ def test_check_reports_incorrect_cells(
     client.get("/new")
 
     board = [row[:] for row in solution]
-    board[2][4] = 0
+    board[2][4] = solution[2][4] % 9 + 1
+    board[1][1] = 0
     response = client.post("/check", json={"board": board})
 
     assert response.status_code == 200
     assert response.get_json() == {"incorrect": [[2, 4]]}
+
+
+def test_hint_fills_correct_empty_cell_and_increments_count(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A hint returns the solution value and increments the game's count."""
+    puzzle = [[0 for _ in range(9)] for _ in range(9)]
+    solution = [
+        [(row * 3 + row // 3 + col) % 9 + 1 for col in range(9)]
+        for row in range(9)
+    ]
+    monkeypatch.setattr(
+        app_module.sudoku_logic,
+        "generate_puzzle",
+        lambda difficulty: (puzzle, solution),
+    )
+    client.get("/new")
+
+    response = client.post("/hint", json={"board": puzzle})
+    data = response.get_json()
+
+    assert response.status_code == 200
+    assert data is not None
+    assert puzzle[data["row"]][data["col"]] == 0
+    assert data["value"] == solution[data["row"]][data["col"]]
+    assert data["hints_used"] == 1
+    assert app_module.CURRENT["hints_used"] == 1
+    assert [data["row"], data["col"]] in app_module.CURRENT["hint_cells"]
+
+
+def test_hint_on_full_board_returns_error(client: FlaskClient) -> None:
+    """The hint route rejects a board without any empty cells."""
+    puzzle = [[0 for _ in range(9)] for _ in range(9)]
+    solution = [
+        [(row * 3 + row // 3 + col) % 9 + 1 for col in range(9)]
+        for row in range(9)
+    ]
+    app_module.CURRENT.update(puzzle=puzzle, solution=solution)
+
+    response = client.post("/hint", json={"board": solution})
+
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "No empty cells available for a hint"}
+    assert app_module.CURRENT["hints_used"] == 0
