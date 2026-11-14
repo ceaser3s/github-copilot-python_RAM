@@ -8,6 +8,7 @@ import {
 } from './leaderboard.js';
 
 const SIZE = 9;
+const THEME_STORAGE_KEY = 'sudokuTheme';
 let puzzle = [];
 let hintsUsed = 0;
 let elapsedSeconds = 0;
@@ -17,6 +18,30 @@ let completionCheckId = 0;
 let gameCompleted = false;
 let leaderboardEntries = [];
 let pendingScore = null;
+
+function initializeThemeToggle() {
+  const button = document.getElementById('theme-toggle');
+  const icon = document.getElementById('theme-icon');
+
+  const updateTheme = (theme) => {
+    const isDark = theme === 'dark';
+    document.documentElement.dataset.theme = theme;
+    icon.textContent = isDark ? '☀' : '☾';
+    button.setAttribute('aria-label', `Switch to ${isDark ? 'light' : 'dark'} mode`);
+    button.setAttribute('aria-pressed', String(isDark));
+  };
+
+  updateTheme(document.documentElement.dataset.theme);
+  button.addEventListener('click', () => {
+    const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    updateTheme(theme);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch (error) {
+      console.error('Unable to save the Sudoku theme preference.', error);
+    }
+  });
+}
 
 function setMessage(text, kind = 'error') {
   const message = document.getElementById('message');
@@ -332,6 +357,7 @@ async function requestHint() {
 }
 
 window.addEventListener('load', () => {
+  initializeThemeToggle();
   leaderboardEntries = loadLeaderboard();
   renderLeaderboard();
   document.getElementById('new-game').addEventListener('click', newGame);
