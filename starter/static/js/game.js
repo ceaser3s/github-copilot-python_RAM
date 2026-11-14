@@ -1,4 +1,4 @@
-// Client-side rendering and interaction for the Flask-backed Sudoku
+// Client-side rendering and interaction for the Flask-backed Sudoku.
 const SIZE = 9;
 let puzzle = [];
 
@@ -96,10 +96,8 @@ async function checkSolution() {
   }
 }
 
-// Wire buttons
 window.addEventListener('load', () => {
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
-  // initialize
   newGame();
 });
