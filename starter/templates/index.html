@@ -9,6 +9,21 @@
 <body>
   <h1>Sudoku Game</h1>
   <div id="sudoku-board"></div>
+  <section id="leaderboard" aria-labelledby="leaderboard-title">
+    <h2 id="leaderboard-title">Top 10 Fastest Times</h2>
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Rank</th>
+          <th scope="col">Name</th>
+          <th scope="col">Time</th>
+          <th scope="col">Level</th>
+          <th scope="col">Hints</th>
+        </tr>
+      </thead>
+      <tbody id="leaderboard-entries"></tbody>
+    </table>
+  </section>
   <p id="timer" aria-live="polite">Time: 00:00</p>
   <div class="controls">
     <label for="difficulty">Difficulty:</label>
@@ -22,6 +37,11 @@
     <button id="hint">Hint</button>
     <span id="hint-count" aria-live="polite">Hints used: 0</span>
     <p id="message" role="status" aria-live="polite"></p>
+    <form id="score-form" hidden>
+      <label for="player-name">Your time made the Top 10! Name:</label>
+      <input id="player-name" name="name" type="text" maxlength="30" autocomplete="name">
+      <button type="submit">Save Score</button>
+    </form>
   </div>
   <script type="module" src="{{ url_for('static', filename='js/game.js') }}"></script>
 </body>

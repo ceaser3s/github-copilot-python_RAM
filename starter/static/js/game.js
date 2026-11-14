@@ -1,11 +1,22 @@
 // Client-side rendering and interaction for the Flask-backed Sudoku.
+import {
+  addEntry,
+  formatTime as formatLeaderboardTime,
+  loadLeaderboard,
+  qualifies,
+  saveLeaderboard
+} from './leaderboard.js';
+
 const SIZE = 9;
 let puzzle = [];
 let hintsUsed = 0;
 let elapsedSeconds = 0;
+let currentDifficulty = 'medium';
 let timerInterval = null;
 let completionCheckId = 0;
 let gameCompleted = false;
+let leaderboardEntries = [];
+let pendingScore = null;
 
 function setMessage(text, kind = 'error') {
   const message = document.getElementById('message');
@@ -54,10 +65,75 @@ function finishGame() {
   gameCompleted = true;
   stopTimer();
   const hintLabel = hintsUsed === 1 ? 'hint' : 'hints';
-  setMessage(
-    `Congratulations! You solved it in ${formatTime(elapsedSeconds)} with ${hintsUsed} ${hintLabel}.`,
-    'success'
-  );
+  const completionMessage =
+    `Congratulations! You solved it in ${formatTime(elapsedSeconds)} with ${hintsUsed} ${hintLabel}.`;
+
+  if (qualifies(leaderboardEntries, elapsedSeconds)) {
+    pendingScore = {
+      time: elapsedSeconds,
+      difficulty: currentDifficulty,
+      hints: hintsUsed
+    };
+    document.getElementById('score-form').hidden = false;
+    document.getElementById('player-name').focus();
+    setMessage(`${completionMessage} Enter your name to save your Top 10 time.`, 'success');
+  } else {
+    setMessage(completionMessage, 'success');
+  }
+}
+
+function renderLeaderboard() {
+  const tableBody = document.getElementById('leaderboard-entries');
+  tableBody.replaceChildren();
+
+  if (leaderboardEntries.length === 0) {
+    const row = document.createElement('tr');
+    const emptyCell = document.createElement('td');
+    emptyCell.colSpan = 5;
+    emptyCell.textContent = 'No times yet.';
+    row.appendChild(emptyCell);
+    tableBody.appendChild(row);
+    return;
+  }
+
+  leaderboardEntries.forEach((entry, index) => {
+    const row = document.createElement('tr');
+    [
+      index + 1,
+      entry.name,
+      formatLeaderboardTime(entry.time),
+      entry.difficulty,
+      entry.hints
+    ].forEach((value) => {
+      const cell = document.createElement('td');
+      // textContent safely renders player-provided names as text, not markup.
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
+    tableBody.appendChild(row);
+  });
+}
+
+function savePendingScore(event) {
+  event.preventDefault();
+  if (!pendingScore) return;
+
+  const playerName = document.getElementById('player-name').value.trim();
+  const updatedEntries = addEntry(leaderboardEntries, {
+    ...pendingScore,
+    name: playerName
+  });
+  if (!saveLeaderboard(updatedEntries)) {
+    setMessage('Your score could not be saved. Check your browser storage settings and try again.');
+    return;
+  }
+
+  leaderboardEntries = updatedEntries;
+  pendingScore = null;
+  document.getElementById('score-form').hidden = true;
+  document.getElementById('player-name').value = '';
+  renderLeaderboard();
+  setMessage('Your score has been added to the Top 10!', 'success');
 }
 
 function getInputs() {
@@ -167,8 +243,12 @@ async function newGame() {
     );
     const data = await readJson(response);
     renderPuzzle(data.puzzle);
+    currentDifficulty = difficulty;
     hintsUsed = 0;
     document.getElementById('hint-count').innerText = 'Hints used: 0';
+    document.getElementById('score-form').hidden = true;
+    document.getElementById('player-name').value = '';
+    pendingScore = null;
     setMessage('');
     startTimer();
   } catch (error) {
@@ -252,8 +332,11 @@ async function requestHint() {
 }
 
 window.addEventListener('load', () => {
+  leaderboardEntries = loadLeaderboard();
+  renderLeaderboard();
   document.getElementById('new-game').addEventListener('click', newGame);
   document.getElementById('check-solution').addEventListener('click', checkSolution);
   document.getElementById('hint').addEventListener('click', requestHint);
+  document.getElementById('score-form').addEventListener('submit', savePendingScore);
   newGame();
 });

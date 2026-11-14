@@ -20,6 +20,34 @@ h1 {
     max-width: calc(100vw - 24px);
 }
 
+#leaderboard {
+    box-sizing: border-box;
+    width: calc(100% - 24px);
+    max-width: 620px;
+    margin: 0 auto 28px;
+    overflow-x: auto;
+}
+
+#leaderboard h2 {
+    color: #333;
+}
+
+#leaderboard table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+}
+
+#leaderboard th,
+#leaderboard td {
+    padding: 8px 12px;
+    border: 1px solid #bbb;
+}
+
+#leaderboard th {
+    background: #e0e0e0;
+}
+
 .sudoku-row {
     display: flex;
 }
@@ -108,6 +136,21 @@ button:hover {
 
 #message.error {
     color: #d32f2f;
+}
+
+#score-form {
+    flex-basis: 100%;
+    margin: 12px;
+}
+
+#score-form[hidden] {
+    display: none;
+}
+
+#player-name {
+    max-width: 180px;
+    padding: 8px;
+    font-size: 16px;
 }
 
 #timer,
