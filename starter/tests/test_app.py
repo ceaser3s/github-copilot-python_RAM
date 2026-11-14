@@ -40,6 +40,58 @@ def test_new_game_returns_generated_puzzle(
     assert generated_clues == [40]
 
 
+def test_new_game_rejects_invalid_difficulty(client: FlaskClient) -> None:
+    """The new-game route rejects unsupported difficulty values."""
+    response = client.get("/new?difficulty=impossible")
+
+    assert response.status_code == 400
+    assert response.get_json() == {
+        "error": "Difficulty must be one of: easy, medium, hard"
+    }
+
+
+def test_new_game_uses_requested_difficulty(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The new-game route forwards a selected difficulty to generation."""
+    puzzle = [[0 for _ in range(9)] for _ in range(9)]
+    solution = [[1 for _ in range(9)] for _ in range(9)]
+    selected_difficulties = []
+
+    def generate_puzzle(difficulty: str) -> tuple[list[list[int]], list[list[int]]]:
+        selected_difficulties.append(difficulty)
+        return puzzle, solution
+
+    monkeypatch.setattr(
+        app_module.sudoku_logic, "generate_puzzle", generate_puzzle
+    )
+
+    response = client.get("/new?difficulty=hard")
+
+    assert response.status_code == 200
+    assert selected_difficulties == ["hard"]
+
+
+def test_new_game_defaults_to_medium(
+    client: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The new-game route selects medium when difficulty is omitted."""
+    selected_difficulties = []
+
+    def generate_puzzle(difficulty: str) -> tuple[list[list[int]], list[list[int]]]:
+        selected_difficulties.append(difficulty)
+        return [[0] * 9 for _ in range(9)], [[1] * 9 for _ in range(9)]
+
+    monkeypatch.setattr(
+        app_module.sudoku_logic, "generate_puzzle", generate_puzzle
+    )
+
+    response = client.get("/new")
+
+    assert response.status_code == 200
+    assert selected_difficulties == ["medium"]
+
+
 def test_check_without_game_returns_error(client: FlaskClient) -> None:
     """The check route reports an error when no game has started."""
     response = client.post("/check", json={"board": [[0] * 9 for _ in range(9)]})

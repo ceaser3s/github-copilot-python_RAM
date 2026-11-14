@@ -37,18 +37,19 @@ function renderPuzzle(puz) {
       const inp = inputs[idx];
       if (val !== 0) {
         inp.value = val;
-        inp.disabled = true;
+        inp.readOnly = true;
         inp.className += ' prefilled';
       } else {
         inp.value = '';
-        inp.disabled = false;
+        inp.readOnly = false;
       }
     }
   }
 }
 
 async function newGame() {
-  const res = await fetch('/new');
+  const difficulty = document.getElementById('difficulty').value;
+  const res = await fetch(`/new?difficulty=${encodeURIComponent(difficulty)}`);
   const data = await res.json();
   renderPuzzle(data.puzzle);
   document.getElementById('message').innerText = '';
@@ -81,7 +82,7 @@ async function checkSolution() {
   const incorrect = new Set(data.incorrect.map(x => x[0]*SIZE + x[1]));
   for (let idx = 0; idx < inputs.length; idx++) {
     const inp = inputs[idx];
-    if (inp.disabled) continue;
+    if (inp.readOnly) continue;
     inp.className = 'sudoku-cell';
     if (incorrect.has(idx)) {
       inp.className = 'sudoku-cell incorrect';

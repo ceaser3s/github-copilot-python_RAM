@@ -21,17 +21,33 @@ def index() -> str:
 
 @blueprint.route("/new")
 def new_game() -> Response | tuple[Response, int]:
-    """Generate a puzzle and return it as JSON."""
-    clues_value = request.args.get("clues", "35")
-    try:
-        clues = int(clues_value)
-    except ValueError:
-        return jsonify({"error": "Clues must be an integer between 0 and 81"}), 400
+    """Generate a puzzle at the requested difficulty and return it as JSON."""
+    difficulty = request.args.get("difficulty", "medium").lower()
+    if difficulty not in generator.DIFFICULTY_CLUES:
+        return (
+            jsonify({"error": "Difficulty must be one of: easy, medium, hard"}),
+            400,
+        )
 
-    if not 0 <= clues <= generator.SIZE * generator.SIZE:
-        return jsonify({"error": "Clues must be an integer between 0 and 81"}), 400
+    if "clues" in request.args:
+        clues_value = request.args["clues"]
+        try:
+            clues = int(clues_value)
+        except ValueError:
+            return (
+                jsonify({"error": "Clues must be an integer between 0 and 81"}),
+                400,
+            )
 
-    puzzle, solution = generator.generate_puzzle(clues)
+        if not 0 <= clues <= generator.SIZE * generator.SIZE:
+            return (
+                jsonify({"error": "Clues must be an integer between 0 and 81"}),
+                400,
+            )
+        puzzle, solution = generator.generate_puzzle(clues)
+    else:
+        puzzle, solution = generator.generate_puzzle(difficulty)
+
     CURRENT["puzzle"] = puzzle
     CURRENT["solution"] = solution
     return jsonify({"puzzle": puzzle})
