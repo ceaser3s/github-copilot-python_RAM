@@ -67,3 +67,33 @@ cd starter
 pip install -r requirements.txt
 python -m pytest
 ```
+
+
+
+## Features
+- Easy / Medium / Hard difficulty, and every puzzle has exactly one solution
+- Locked prefilled cells, live conflict highlighting, Check and Hint buttons
+- Timer, congratulatory message, and a Top 10 fastest times list saved in localStorage
+- Light/dark mode toggle and a responsive layout with alternating 3x3 squares
+
+## Project Structure
+- `starter/app.py` – app factory and entry point
+- `starter/routes.py` – Flask routes (Blueprint)
+- `starter/sudoku/` – puzzle generator, solver (unique-solution check) and validator
+- `starter/static/` – CSS and JavaScript (game logic, leaderboard, theme toggle)
+- `starter/templates/` – HTML template
+- `starter/tests/` – pytest tests
+- `.github/copilot-instructions.md` – instructions for Copilot (copy in `instruction.md`)
+
+## How I Used GitHub Copilot
+Screenshots of my prompts and Copilot's responses are in the `Screenshots/` folder:
+- Setting up the testing framework (`initial_tests.png`, `copilot_testing_framework_setup_*.png`)
+- Refactoring into modules (`copilot_refactor_structure_*.png`)
+- Unique-solution puzzles and difficulty levels (`copilot_unique_solution_*.png`)
+- Hint, Check, live feedback and timer (`copilot_hint_check_feedback_*.png`)
+- Top 10 scores in localStorage (`copilot_top10_localstorage_*.png`)
+- Styling the 3x3 squares, dark mode and responsive layout (`copilot_3x3_square_colors_*.png`)
+
+I reviewed each suggestion before accepting it. I rejected Copilot's request to create
+`tasks.json` because it isn't needed for this project
+(see `Screenshots/copilot_rejected_suggestion.png`).
